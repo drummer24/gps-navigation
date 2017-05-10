@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <style type="text/css">
+    html, body{
+    height: 100%;
+    width: 100%;
+}
+   </style>
+</head>
+<body>
+
+<div id="map" style="width:100%;height:95%"></div>
+
+<button onclick="stop()">stop</button>
+
+<script>
+var id;
+var poly
+var service
+var markers=[]
+function point (x,y,speed,heading,accuracy,time) {
+    this.x = x;
+    this.y = y;
+    this.speed = speed
+    this.heading = heading
+    this.accuracy = accuracy
+    this.time=time
+}
+
+
+var suradnice=[]
+var lat_lng = new Array();
+var destinationmarker=null
+options = {
+  enableHighAccuracy: true,
+  timeout: 1000,
+  maximumAge: 0
+};
+function getLocation(map) {
+     if((navigator.geolocation)){
+        id = navigator.geolocation.watchPosition(function(position){
+            
+            showPosition(map,position)
+	    , {options}     	
+	
+    },function error(msg){alert('Please enable your GPS position future.');  
+
+  })
+  }else { 
+    	
+    }
+    
+   
+}
+function addposition(position){
+ suradnice.push(new point(position.coords.latitude,position.coords.longitude,position.coords.speed,position.coords.heading,position.coords.accuracy,position.timestamp));
+
+}
+function set_destination_Marker(map, location) {
+   remove_marker_from_map(destinationmarker)
+   destinationmarker= new google.maps.Marker({
+    position: location,
+    map: map
+  });
+  drawroute(map)
+}
+
+
+function calculateSpeed(t1, lat1, lon1, t2, lat2, lon2) {
+  if (typeof(Number.prototype.toRad) === "undefined") {
+    Number.prototype.toRad = function() {
+      return this * Math.PI / 180;
+    }
+  }
+  
+  var R = 6371; // km
+  var dLat = (lat2-lat1).toRad();
+  var dLon = (lon2-lon1).toRad();
+  var lat1 = lat1.toRad();
+  var lat2 = lat2.toRad();
+
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) *    Math.cos(lat2); 
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  var distance = R * c;
+ 
+ 
+alert((distance / (t2 - t1))*3.6)
+  return (distance / (t2 - t1))*3.6;
+}
+
+function drawroute(map){
+
+if (poly!=null || poly!=undefined){
+poly.setMap(null)
+
+
+}
+var path = new google.maps.MVCArray();
+           service = new google.maps.DirectionsService();
+           
+          
+           poly = new google.maps.Polyline({ map: map, strokeColor: '#FF8200' });
+           var lat_lng = new Array();
+            var myLatlng = new google.maps.LatLng(suradnice[suradnice.length-1].x, suradnice[suradnice.length-1].y);
+            lat_lng.push(myLatlng);
+           var myLatlng = new google.maps.LatLng(destinationmarker.position.lat(),destinationmarker.position.lng());
+            lat_lng.push(myLatlng);
+           for (var i = 0; i < lat_lng.length; i++) {
+               if ((i + 1) < lat_lng.length) {
+                   var src = lat_lng[i];
+                   var des = lat_lng[i + 1];
+                   path.push(src);
+                   poly.setPath(path);
+                   service.route({
+                       origin: src,
+                       destination: des,
+                       travelMode: google.maps.DirectionsTravelMode.WALKING
+                   }, function (result, status) {
+                       if (status == google.maps.DirectionsStatus.OK) {
+                           for (var i = 0, len = result.routes[0].overview_path.length; i < len; i++) {
+                               path.push(result.routes[0].overview_path[i]);
+                           }
+                       }
+                   });
+               }
+           }
+}
+      
+
+function drawpath(map){
+var curr=new google.maps.LatLng(suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y);
+var dest=new google.maps.LatLng(suradnice[suradnice.length-2].x,suradnice[suradnice.length-2].y);
+var color="#0000FF"
+if (suradnice[suradnice.length-1].speed>=10){
+color='green'
+}
+var flightPath = new google.maps.Polyline({
+    path: [curr, dest],
+    strokeColor: color,
+    strokeOpacity: 0.8,
+    strokeWeight: 2
+      
+
+  })
+
+    flightPath.setMap(map);
+
+}
+function addmarker(map,position){
+     var myCenter = new        google.maps.LatLng(position.coords.latitude,position.coords.longitude);
+  markers.push(new google.maps.Marker({position:myCenter}));
+  markers[markers.length-1].setMap(map);
+}
+function changemarkercolor(index){
+markers[index].setIcon('http://maps.google.com/mapfiles/ms/icons/green-dot.png')
+}
+function showPosition(map,position) {
+addposition(position)   
+addmarker(map,position)
+var curr_Latlng = new 
+google.maps.LatLng(position.coords.latitude,position.coords.longitude);
+                lat_lng.push(curr_Latlng );
+
+if (suradnice.length>1){
+ 
+var speed = calculateSpeed(suradnice[suradnice.length-2].time / 1000, suradnice[suradnice.length-2].x, suradnice[suradnice.length-2].y,suradnice[suradnice.length-1].time / 1000, suradnice[suradnice.length-1].x, suradnice[suradnice.length-1].y);
+
+suradnice[suradnice.length-2].speed=speed
+suradnice[suradnice.length-1].speed=speed 
+
+if (speed>10){
+changemarkercolor(markers.length-1)
+changemarkercolor(markers.length-2)
+}
+ drawpath(map)
+
+}
+}
+function remove_marker_from_map(marker){
+ if (marker!=null){
+  marker.setMap(null);
+ }
+}
+function myMap() {
+  
+  var myCenter = new        google.maps.LatLng(48.147948, 17.107377);
+  
+  var mapCanvas = document.getElementById("map");
+  var mapOptions = {center: myCenter, zoom: 13};
+  var map = new google.maps.Map(mapCanvas, mapOptions);
+  service = new google.maps.DirectionsService()
+  getLocation(map)
+  google.maps.event.addListener(map, 'click', function(event) {
+    set_destination_Marker(map, event.latLng);
+  });
+}
+function save_coordinates(){
+  var tmp = JSON.stringify(suradnice);
+
+  $.ajax({
+    type: 'POST',
+    url: 'save_coordinates.php',
+    data: {'coordinates': tmp},
+    success: function(msg) {
+      alert("data inserted succesfully");
+    }
+  });
+}
+function stop(){
+	navigator.geolocation.clearWatch(id);
+  save_coordinates()
+  navigator.geolocation.clearWatch(id);
+   
+}
+
+
+</script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBxMnshqKql7s93txpzieTVSVUFfopd2Ww&callback=myMap"></script>
+
+
+</body>
+</html>
