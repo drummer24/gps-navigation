@@ -1,4 +1,1 @@
-# gps-navigation
-# gps-navigation
-# gps-navigation
-# gps-navigation
+  Cieľom tejto diplomovej prace je Preskúmať možnosti a technické prostriedky navigácie osôb prostredníctvom webovej aplikácie v mobilnom zariadení s GPS. Aplikácia bude  zbierať dáta zúčastnených osôb, na základe ktorých navrhne časovo i finančne najvýhodnejšiu trasu z bodu A do bodu B. Predpokladané prostriedky dopravy sú: peší presun a MHD. Aplikácia bude osobu navigovať, monitorovať a robiť prípadné zmeny trasy. Uložené trasy užívateľov bude potrebné vhodnými metódami (napr. Kalmanov filter) previesť do konzistentnej podoby vzhľadom na použitú mapu mesta. V rámci trasy sa bude automaticky detegovať spôsob presunu osoby (pešo, linka MHD).
