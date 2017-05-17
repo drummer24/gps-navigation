@@ -86,7 +86,7 @@ function calculateSpeed(t1, lat1, lon1, t2, lat2, lon2) {
   var distance = R * c;
  
  
-alert((distance / (t2 - t1))*3.6)
+//alert((distance / (t2 - t1))*3.6)
   return (distance / (t2 - t1))*3.6;
 }
 
@@ -153,18 +153,7 @@ function addmarker(map,position){
   markers.push(new google.maps.Marker({position:myCenter}));
   markers[markers.length-1].setMap(map);
 }
-function changemarkercolor(index){
-markers[index].setIcon('http://maps.google.com/mapfiles/ms/icons/green-dot.png')
-}
-function showPosition(map,position) {
-addposition(position)   
-addmarker(map,position)
-var curr_Latlng = new 
-google.maps.LatLng(position.coords.latitude,position.coords.longitude);
-                lat_lng.push(curr_Latlng );
-
-if (suradnice.length>1){
- 
+function changespeed(){
 var speed = calculateSpeed(suradnice[suradnice.length-2].time / 1000, suradnice[suradnice.length-2].x, suradnice[suradnice.length-2].y,suradnice[suradnice.length-1].time / 1000, suradnice[suradnice.length-1].x, suradnice[suradnice.length-1].y);
 
 suradnice[suradnice.length-2].speed=speed
@@ -174,9 +163,38 @@ if (speed>10){
 changemarkercolor(markers.length-1)
 changemarkercolor(markers.length-2)
 }
+}
+function destinationreached(){
+currchoords=new google.maps.LatLng(suradnice[length-1].x,suradnice[length-1].y)
+ destchoords=new google.maps.LatLng(destinationmarker.position.lat(),destinationmarker.position.lng())
+ if(google.maps.geometry.spherical
+   .computeDistanceBetween(currchoords,destchoords)<50){
+  alert('ste na mieste!');
+ stop()
+}
+} 
+function changemarkercolor(index){
+markers[index].setIcon('http://maps.google.com/mapfiles/ms/icons/green-dot.png')
+}
+
+function showPosition(map,position) {
+addposition(position)   
+addmarker(map,position)
+
+var curr_Latlng = new 
+google.maps.LatLng(position.coords.latitude,position.coords.longitude);
+                lat_lng.push(curr_Latlng );
+
+if (suradnice.length>1){
+ changespeed()
  drawpath(map)
 
 }
+if (destinationmarker!=null){
+drawroute(map)
+destinationreached()
+
+} 
 }
 function remove_marker_from_map(marker){
  if (marker!=null){
