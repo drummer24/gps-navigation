@@ -13,8 +13,71 @@
 <div id="map" style="width:100%;height:95%"></div>
 
 <button onclick="stop()">stop</button>
-
+<script type="text/javascript" src="sylvester.src.js"></script>
+<script type="text/javascript" src="kalman.js"></script>
 <script>
+
+
+function KalmanLatLong(Q_metres_per_second) { 
+ this.Q_metres_per_second = Q_metres_per_second; variance = -1;
+    this.MinAccuracy = 1;    
+    this.TimeStamp_milliseconds=0;
+    this.lat=0;
+    this.lng=0;
+    this.variance; // P matrix.  Negative means object uninitialised.  NB: units irrelevant, as long as same units used throughout
+  }  
+    
+
+    KalmanLatLong.prototype.get_TimeStamp= function() { return this.TimeStamp_milliseconds; }
+    KalmanLatLong.prototype.get_lat=function() { return this.lat; }
+    KalmanLatLong.prototype.get_lng=function() { return this.lng; }
+    KalmanLatLong.prototype.get_accuracy=function() { return Math.sqrt(this.variance); }
+
+    KalmanLatLong.prototype.SetState=function(lat, lng, accuracy,  TimeStamp_milliseconds) {
+        this.lat=lat; this.lng=lng; this.variance = accuracy * accuracy; this.TimeStamp_milliseconds=TimeStamp_milliseconds;
+    }
+
+    /// <summary>
+    /// Kalman filter processing for lattitude and longitude
+    /// </summary>
+    /// <param name="lat_measurement_degrees">new measurement of lattidude</param>
+    /// <param name="lng_measurement">new measurement of longitude</param>
+    /// <param name="accuracy">measurement of 1 standard deviation error in metres</param>
+    /// <param name="TimeStamp_milliseconds">time of measurement</param>
+    /// <returns>new state</returns>
+    KalmanLatLong.prototype.Process=function(lat_measurement, lng_measurement,  accuracy, nTimeStamp_milliseconds) {
+        if (accuracy < this.MinAccuracy) accuracy = this.MinAccuracy;
+        if (this.variance < 0) {
+            // if variance < 0, object is unitialised, so initialise with current values
+            this.TimeStamp_milliseconds = nTimeStamp_milliseconds;
+            this.lat=lat_measurement; this.lng = lng_measurement; 
+            this.variance = accuracy*accuracy; 
+        } else {
+            // else apply Kalman filter methodology
+           
+            var TimeInc_milliseconds = nTimeStamp_milliseconds - this.TimeStamp_milliseconds;
+            if (TimeInc_milliseconds > 0) {
+                // time has moved on, so the uncertainty in the current position increases
+                this.variance += TimeInc_milliseconds * this.Q_metres_per_second * this.Q_metres_per_second / 1000;
+                this.TimeStamp_milliseconds = nTimeStamp_milliseconds;
+         
+                // TO DO: USE VELOCITY INFORMATION HERE TO GET A BETTER ESTIMATE OF CURRENT POSITION
+            }
+
+            // Kalman gain matrix K = Covarariance * Inverse(Covariance + MeasurementVariance)
+            // NB: because K is dimensionless, it doesn't matter that variance has different units to lat and lng
+            var K = this.variance / (this.variance + accuracy * accuracy);
+            // apply K
+                   console.log(this.variance+ accuracy * accuracy)
+            this.lat += K * (lat_measurement - this.lat);
+            this.lng += K * (lng_measurement - this.lng);
+            // new Covarariance  matrix is (IdentityMatrix - K) * Covarariance 
+            this.variance = (1 - K) * this.variance;
+           
+        }
+    }
+
+
 var id;
 var poly
 var service
@@ -27,11 +90,15 @@ function point (x,y,speed,heading,accuracy,time) {
     this.accuracy = accuracy
     this.time=time
 }
-
-
+  point.prototype.set_x= function(x) { this.x=x }
+  point.prototype.set_y= function(y) { this.y=y }
+  point.prototype.set_accuracy= function(accuracy) { this.accuracy=accuracy }
+  point.prototype.set_time= function(time) { this.time=time }
 var suradnice=[]
 var lat_lng = new Array();
 var destinationmarker=null
+var latarr=[] 
+var lonarr=[]
 options = {
   enableHighAccuracy: true,
   timeout: 1000,
@@ -45,7 +112,6 @@ function getLocation(map) {
 	    , {options}     	
 	
     },function error(msg){alert('Please enable your GPS position future.');  
-
   })
   }else { 
     	
@@ -55,7 +121,6 @@ function getLocation(map) {
 }
 function addposition(position){
  suradnice.push(new point(position.coords.latitude,position.coords.longitude,position.coords.speed,position.coords.heading,position.coords.accuracy,position.timestamp));
-
 }
 function set_destination_Marker(map, location) {
    remove_marker_from_map(destinationmarker)
@@ -65,8 +130,6 @@ function set_destination_Marker(map, location) {
   });
   drawroute(map)
 }
-
-
 function calculateSpeed(t1, lat1, lon1, t2, lat2, lon2) {
   if (typeof(Number.prototype.toRad) === "undefined") {
     Number.prototype.toRad = function() {
@@ -79,7 +142,6 @@ function calculateSpeed(t1, lat1, lon1, t2, lat2, lon2) {
   var dLon = (lon2-lon1).toRad();
   var lat1 = lat1.toRad();
   var lat2 = lat2.toRad();
-
   var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
     Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) *    Math.cos(lat2); 
   var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
@@ -89,13 +151,9 @@ function calculateSpeed(t1, lat1, lon1, t2, lat2, lon2) {
 //alert((distance / (t2 - t1))*3.6)
   return (distance / (t2 - t1))*3.6;
 }
-
 function drawroute(map){
-
 if (poly!=null || poly!=undefined){
 poly.setMap(null)
-
-
 }
 var path = new google.maps.MVCArray();
            service = new google.maps.DirectionsService();
@@ -128,7 +186,6 @@ var path = new google.maps.MVCArray();
            }
 }
       
-
 function drawpath(map){
 var curr=new google.maps.LatLng(suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y);
 var dest=new google.maps.LatLng(suradnice[suradnice.length-2].x,suradnice[suradnice.length-2].y);
@@ -142,58 +199,71 @@ var flightPath = new google.maps.Polyline({
     strokeOpacity: 0.8,
     strokeWeight: 2
       
-
   })
-
     flightPath.setMap(map);
-
 }
-function addmarker(map,position){
-     var myCenter = new        google.maps.LatLng(position.coords.latitude,position.coords.longitude);
+function addmarker(map){
+     var myCenter = new        google.maps.LatLng(suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y);
   markers.push(new google.maps.Marker({position:myCenter}));
   markers[markers.length-1].setMap(map);
 }
 function changespeed(){
 var speed = calculateSpeed(suradnice[suradnice.length-2].time / 1000, suradnice[suradnice.length-2].x, suradnice[suradnice.length-2].y,suradnice[suradnice.length-1].time / 1000, suradnice[suradnice.length-1].x, suradnice[suradnice.length-1].y);
-
+   alert(speed)
 suradnice[suradnice.length-2].speed=speed
 suradnice[suradnice.length-1].speed=speed 
-
 if (speed>10){
 changemarkercolor(markers.length-1)
 changemarkercolor(markers.length-2)
 }
 }
 function destinationreached(){
+    if (suradnice[length-1]!==undefined || suradnice[length-1]!==null){
 currchoords=new google.maps.LatLng(suradnice[length-1].x,suradnice[length-1].y)
  destchoords=new google.maps.LatLng(destinationmarker.position.lat(),destinationmarker.position.lng())
  if(google.maps.geometry.spherical
    .computeDistanceBetween(currchoords,destchoords)<50){
-  alert('ste na mieste!');
+  alert('ste na mieste!'
+  ); 
  stop()
+   }
 }
 } 
 function changemarkercolor(index){
-markers[index].setIcon('http://maps.google.com/mapfiles/ms/icons/green-dot.png')
+markers[index].setIcon('https://maps.google.com/mapfiles/ms/icons/green-dot.png'
+)
+}
+function showPosition(map,position) {
+if (suradnice.length>=1){
+var kalman=new KalmanLatLong(suradnice[suradnice.length-1].speed)    
+kalman.SetState(suradnice[suradnice.length-1].x, suradnice[suradnice.length-1].y, suradnice[suradnice.length-1].accuracy,  suradnice[suradnice.length-1].time)
+
+kalman.Process(position.coords.latitude,position.coords.longitude,  position.coords.accuracy, position.timestamp)
+
+}
+addposition(position,map)   
+if (kalman!==undefined && kalman!== null){
+    suradnice[suradnice.length-1].set_time(kalman.get_TimeStamp())
+    suradnice[suradnice.length-1].set_x(kalman.get_lat())
+    suradnice[suradnice.length-1].set_y(kalman.get_lng())
+    suradnice[suradnice.length-1].set_accuracy(kalman.get_accuracy())
 }
 
-function showPosition(map,position) {
-addposition(position)   
-addmarker(map,position)
+addmarker(map)
 
+
+  
+  
 var curr_Latlng = new 
 google.maps.LatLng(position.coords.latitude,position.coords.longitude);
                 lat_lng.push(curr_Latlng );
-
 if (suradnice.length>1){
  changespeed()
  drawpath(map)
-
 }
-if (destinationmarker!=null){
+if (destinationmarker!==null){
 drawroute(map)
 destinationreached()
-
 } 
 }
 function remove_marker_from_map(marker){
@@ -216,7 +286,6 @@ function myMap() {
 }
 function save_coordinates(){
   var tmp = JSON.stringify(suradnice);
-
   $.ajax({
     type: 'POST',
     url: 'save_coordinates.php',
@@ -232,6 +301,7 @@ function stop(){
   navigator.geolocation.clearWatch(id);
    
 }
+
 
 
 </script>
