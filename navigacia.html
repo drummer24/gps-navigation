@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <style type="text/css">
+    html, body{
+    height: 100%;
+    width: 100%;
+}
+   </style>
+</head>
+<body>
+
+<div id="map" style="width:100%;height:95%"></div>
+
+<button onclick="stop()">stop</button>
+<button onclick="">load</button>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<script src="math.js"></script>
+<script src="kalman.js"> </script>
+<script>
+var rate = 0.2
+;
+var pnoise = 0.1
+;
+var mnoise =0.4;
+var kalmanError = [];
+var gpsError = [];
+var kalmanAvg = 0;
+var gpsAvg = 0
+var kalmanX = new KalmanFilter(rate,pnoise,mnoise);
+ var kalmanY = new KalmanFilter(rate,pnoise,mnoise);
+var id;
+var poly
+var flightPath
+var service
+var markers=[]
+var pointsobj=[]
+var graf=[]
+function search(pointsobj,id){
+    var sus=[]
+     for(var i=0; i<pointsobj.length; i++){
+         if(pointsobj[i].id==id){
+             console.log(id)
+             return [i,id]
+         }
+         
+         
+     }
+
+    
+}
+Array.prototype.remove = function() {
+    var what, a = arguments, L = a.length, ax;
+    while (L && this.length) {
+        what = a[--L];
+        while ((ax = this.indexOf(what)) !== -1) {
+            this.splice(ax, 1);
+        }
+    }
+    return this;
+};
+
+function point (id,x,y,speed,heading,accuracy,time,filtrovany) {
+    this.id=id
+    this.x = x;
+    this.y = y;
+    this.speed = speed
+    this.heading = heading
+    this.accuracy = accuracy
+    this.time=time
+    this.filtrovany=filtrovany
+}
+  point.prototype.set_x= function(x) { this.x=x }
+  point.prototype.set_y= function(y) { this.y=y }
+  point.prototype.set_accuracy= function(accuracy) { this.accuracy=accuracy }
+  point.prototype.set_time= function(time) { this.time=time }
+var suradnice=[]
+function AStarPathFinder(pointsobj,startindex, endindex,graf,map) {
+    //drawpath(map,pointsobj,startindex,endindex)
+    console.log(pointsobj[endindex])
+    
+    var bestr=getDistanceFromLatLonInKm(pointsobj[startindex].x,pointsobj[startindex].y,pointsobj[endindex].x,pointsobj[endindex].y)
+    //console.log(bestr)
+    var index=-1
+    var openList   = [];
+    var closedList = [];
+    var curr=0
+    
+    openList.push(pointsobj[startindex].id);
+     while(openList.length>0) {
+        
+      
+      for(var i=0; i<openList.length; i++) {
+           
+            index=search(pointsobj,openList[i])
+            console.log('open',' ',openList)
+            console.log(index)
+            if (index==undefined){
+                return true
+            }
+            if (graf[index[1]].length==1){
+                beatr=getDistanceFromLatLonInKm(pointsobj[index[0]].x,pointsobj[index[0]].y,pointsobj[endindex].x,pointsobj[endindex].y)
+                drawpath(map,pointsobj,startindex,index[0])
+                
+                
+                
+            }else{
+             if(getDistanceFromLatLonInKm(pointsobj[index[0]].x,pointsobj[index[0]].y,pointsobj[endindex].x,pointsobj[endindex].y)>bestr){
+                bestr=getDistanceFromLatLonInKm(pointsobj[index[0]].x,pointsobj[index[0]].y,pointsobj[endindex].x,pointsobj[endindex].y)
+                //console.log(index[1])
+                
+           
+             }else{
+                   
+             }
+            }
+            curr=index[1]
+            openList.remove(curr)     
+      closedList.push(curr);
+    
+       
+            
+           if (curr==pointsobj[endindex].id){
+            console.log(closedList)
+                break
+            }
+            for(j =0; j<graf[curr].length;j++){
+                      
+                      if (closedList.includes(graf[curr][j][0])==false){
+                          //console.log(graf[curr])
+                          //console.log(graf)
+                      openList.push(graf[curr][j][0])
+                      }
+                      
+        }    
+     }
+     
+      
+     }
+     if (curr==pointsobj[endindex].id){
+           i1=search(pointsobj,closedList[startindex])
+           for (var k=0;k<closedList.length-1;k++){
+               
+               
+               i2=search(pointsobj,closedList[k])
+                
+               drawpath(map,pointsobj,i1[0],i2[0])
+               i1=i2
+               console.log(i1[0],' ',i1[0])  
+           }
+               
+    }
+     
+}
+var nefiltrovanesuradnice=[]
+var lat_lng = new Array();
+var destinationmarker=null
+var latarr=[] 
+var lonarr=[]
+options = {
+  enableHighAccuracy: true,
+  timeout: 1000,
+  maximumAge: 0
+};
+function getLocation(map) {
+     if((navigator.geolocation)){
+        id = navigator.geolocation.watchPosition(function(position){
+            
+            showPosition(map,position)
+	    , {options}     	
+	
+    },function error(msg){alert('Please enable your GPS position future.');  
+  })
+  }else { 
+    	
+    }
+    
+   
+}
+function addposition(position,suradnice, filtrovany){
+    
+ suradnice.push(new point(0,position.coords.latitude,position.coords.longitude,position.coords.speed,position.coords.heading,position.coords.accuracy,position.timestamp, filtrovany));
+}
+function set_destination_Marker(map, location) {
+   remove_marker_from_map(destinationmarker)
+  
+   destinationmarker= new google.maps.Marker({
+    position: location,
+    map: map
+  });
+  succ(map)
+ // drawroute(map,suradnice[suradnice.length-1].x, suradnice[suradnice.length-1].y)
+}
+function toRad(value) {
+      var RADIANT_CONSTANT = 0.0174532925199433;
+      return (value * RADIANT_CONSTANT);
+    }
+function getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2) {
+    var R = 6371; // Radius of the earth in km
+    var dLat = deg2rad(lat2-lat1);  // deg2rad below
+    var dLon = deg2rad(lon2-lon1); 
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2)
+    ; 
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    var d = R * c; // Distance in km
+    return d;
+}
+
+function deg2rad(deg) {
+    return deg * (Math.PI/180)
+}
+function calculateSpeed(t1, lat1, lon1, t2, lat2, lon2) {
+  d=getDistanceFromLatLonInKm(lat1,lon1,lat2,lon2)
+  return (d/((t2-t1)*0.01))*3600;
+}
+function drawroute(map,x,y,x1,y1){
+
+var path = new google.maps.MVCArray();
+           service = new google.maps.DirectionsService();
+   console.log(x,y,x1,y1)        
+   console.log(path)       
+           poly = new google.maps.Polyline({ map: map, strokeColor: '#FF8200' });
+           var lat_lng = new Array();
+            var myLatlng = new google.maps.LatLng(x,y);
+            lat_lng.push(myLatlng);
+           var myLatlng = new google.maps.LatLng(x1,y1);
+            lat_lng.push(myLatlng);
+           for (var i = 0; i < lat_lng.length; i++) {
+               if ((i + 1) < lat_lng.length) {
+                   var src = lat_lng[i];
+                   var des = lat_lng[i + 1];
+                   path.push(src);
+                   poly.setPath(path);
+                   service.route({
+                       origin: src,
+                       destination: des,
+                       travelMode: google.maps.DirectionsTravelMode.WALKING
+                   }, function (result, status) {
+                       if (status == google.maps.DirectionsStatus.OK) {
+                           for (var i = 0, len = result.routes[0].overview_path.length; i < len; i++) {
+                               path.push(result.routes[0].overview_path[i]);
+                           }
+                       }
+                   });
+               }
+           }
+}
+      
+function drawpath(map,s,i1,i2){
+
+var curr=new google.maps.LatLng(Number(s[i1].x),Number(s[i1].y));
+var dest=new google.maps.LatLng(Number(s[i2].x),Number(s[i2].y));
+var color="#0000FF"
+console.log(curr,dest)
+if (s[s.length-1].speed>=10){
+color='green'
+}
+flightPath = new google.maps.Polyline({
+    path: [curr, dest],
+    strokeColor: color,
+    strokeOpacity: 0.8,
+    strokeWeight: 2
+      
+  })
+    flightPath.setMap(map);
+}
+function addmarker(map){
+     var myCenter = new        google.maps.LatLng(suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y);
+  markers.push(new google.maps.Marker({position:myCenter}));
+  markers[markers.length-1].setMap(map);
+}
+function changespeed(){
+var speed=calculateSpeed(suradnice[suradnice.length-2].time, suradnice[suradnice.length-2].x, suradnice[suradnice.length-2].y, suradnice[suradnice.length-1].time, suradnice[suradnice.length-1].x, suradnice[suradnice.length-1].y) 
+ suradnice[suradnice.length-2].speed=speed
+ suradnice[suradnice.length-1].speed=speed
+if (speed>10){
+changemarkercolor(markers.length-1)
+changemarkercolor(markers.length-2)
+}
+}
+function destinationreached(){
+    
+    if (suradnice[suradnice.length-1]!==undefined && suradnice[suradnice.length-1]!==null){
+currchoords=new google.maps.LatLng(suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y)
+ destchoords=new google.maps.LatLng(destinationmarker.position.lat(),destinationmarker.position.lng())
+ 
+ if(google.maps.geometry.spherical
+   .computeDistanceBetween(currchoords,destchoords)<50){
+  alert('ste na mieste!'
+  ); 
+ stop()
+   }
+}
+} 
+function changemarkercolor(index){
+markers[index].setIcon('https://maps.google.com/mapfiles/ms/icons/green-dot.png'
+)
+}
+function showPosition(map,position) {
+if (suradnice.length>=1){
+var myCenter = new        google.maps.LatLng(position.coords.latitude,position.coords.longitude);
+  var marker= new google.maps.Marker({position:myCenter});
+  marker.setMap(map);
+  marker.setIcon('https://maps.google.com/mapfiles/ms/icons/green-dot.png'
+)
+}
+addposition(position,nefiltrovanesuradnice,1)
+addposition(position,suradnice,0)   
+var filteredx= kalmanX.update(suradnice[suradnice.length-1].x);
+var filteredy= kalmanY.update(suradnice[suradnice.length-1].y);
+    suradnice[suradnice.length-1].x=filteredx[0]
+    suradnice[suradnice.length-1].y=filteredy[0]
+    
+addmarker(map)
+  
+  
+var curr_Latlng = new 
+google.maps.LatLng(position.coords.latitude,position.coords.longitude);
+                lat_lng.push(curr_Latlng );
+if (suradnice.length>1){
+ changespeed()
+ drawpath(map,suradnice,suradnice.length-2,suradnice.length-1)
+}
+if (destinationmarker!==null){
+drawroute(map)
+destinationreached()
+} 
+}
+function remove_marker_from_map(marker){
+ if (marker!=null){
+  marker.setMap(null);
+ }
+}
+function myMap() {
+  
+  var myCenter = new        google.maps.LatLng(48.147948, 17.107377);
+  
+  var mapCanvas = document.getElementById("map");
+  var mapOptions = {center: myCenter, zoom: 13};
+  var map = new google.maps.Map(mapCanvas, mapOptions);
+  
+  service = new google.maps.DirectionsService()
+  load(map)
+  
+  
+  getLocation(map)
+  google.maps.event.addListener(map, 'click', function(event) {
+    set_destination_Marker(map, event.latLng);
+  });
+}
+function save_coordinates(){
+  var tmp = {"suradnice":suradnice,
+              "nefiltrovanesuradnice":nefiltrovanesuradnice}
+              console.log(nefiltrovanesuradnice,suradnice)
+        tmp=JSON.stringify(tmp)
+  console.log(tmp)
+ 
+  $.ajax({
+    type: 'POST',
+    url: 'save_coordinates.php',
+    data: {'coordinates': tmp},
+    success: function(msg) {
+     
+    }
+  });
+}
+function load(map) {
+
+        console.log(map)
+       return $.ajax({ 
+            type: "GET",
+            url: "load_choords.php",
+            dataType: "json",                 
+            success: function (response) {
+             
+             
+             
+                for(var i=0;i<response.length-2;i++){
+                    //console.log(response[i])
+                    
+                    /*if (navstivene.includes(i)==false){
+                    drawpath(map,response,i,i+1)
+                    navstivene.push(i)
+                        
+                    }*/
+                  
+                   // console.log(filteredx,response[i].x)
+                   if (response[i].bsid1 in graf){
+                           graf[response[i].bsid1].push([response[i].bsid2,response[i].travtime])
+                      }else{
+                          console.log(response[i].heading)
+                           graf[response[i].bsid1]=[[response[i].bsid2,response[i].travtime]]
+                           pointsobj.push(new point(response[i].id,response[i].x,response[i].y,response[i].speed,response[i].heading,response[i].accuracy,response[i].time,response[i].filtrovany))
+                               
+                    
+                      }
+                
+    
+                }
+                
+                
+               
+    
+                }
+            
+        });
+    };
+function stop(){
+	navigator.geolocation.clearWatch(id);
+  save_coordinates()
+  navigator.geolocation.clearWatch(id);
+   
+}
+function succ(map) {
+    if (poly!=null || poly!=undefined){
+poly.setMap(null)
+}
+ 
+
+     
+                    var dist=1000
+                    var dists=1000
+                    var index=0
+                    for(var i=0;i<pointsobj.length;i++){
+                        if(dist> getDistanceFromLatLonInKm(pointsobj[i].x,pointsobj[i].y ,destinationmarker.position.lat(),destinationmarker.position.lng())){
+                            dist= getDistanceFromLatLonInKm(pointsobj[i].x,pointsobj[i].y ,destinationmarker.position.lat(),destinationmarker.position.lng())
+                            index=i
+                            
+                        }
+                    }
+                     var indexs=0
+                    for(var i=0;i<pointsobj.length;i++){
+                        if(dists> getDistanceFromLatLonInKm(pointsobj[i].x,pointsobj[i].y, suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y)){
+                            dists= getDistanceFromLatLonInKm(pointsobj[i].x,pointsobj[i].y, suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y)
+                            indexs=i
+                            
+                        }
+                    }
+                    alert(suradnice[suradnice.length-1].y)
+                if(AStarPathFinder(pointsobj,indexs,index,graf,map)==true){
+                    console.log('tu')
+                    drawroute(map,suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y,destinationmarker.position.lat(),destinationmarker.position.lng())
+                }else{
+                drawroute(map,suradnice[suradnice.length-1].x,suradnice[suradnice.length-1].y,pointsobj[indexs].x,pointsobj[indexs].y)
+     
+                    AStarPathFinder(pointsobj,indexs,index,graf,map)
+               drawroute(map,pointsobj[index].x,pointsobj[index].y,destinationmarker.position.lat(),destinationmarker.position.lng())
+                }
+ 
+}
+/*  for (i = 0; i < response.length; i++){
+                      
+              */
+</script>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBxMnshqKql7s93txpzieTVSVUFfopd2Ww&callback=myMap"></script>
+
+
+</body>
+</html>
+            

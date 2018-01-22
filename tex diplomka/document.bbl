@@ -1,0 +1,20 @@
+\begin{thebibliography}{Mus00}
+
+\bibitem[And08]{anderssen}
+Martin~Møller Andreasen.
+\newblock {\em Non-linear DSGE Models, The Central Difference Kalman Filter,
+  and The Mean Shifted Particle Filter}.
+\newblock 208.
+
+\bibitem[Mus00]{Zarchan}
+Paul Zarchan;~Howard Musoff.
+\newblock {\em Fundamentals of Kalman Filtering: A Practical Approach}.
+\newblock American Institute of Aeronautics and Astronautics, Incorporated,
+  2000.
+
+\bibitem[Wol00]{Wolpert}
+Zoubin Wolpert, Daniel;~Ghahramani.
+\newblock Computational principles of movement neuroscience.
+\newblock 2000.
+
+\end{thebibliography}
